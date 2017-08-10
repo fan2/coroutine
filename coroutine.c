@@ -19,24 +19,24 @@ struct coroutine;
 
 // 调度器
 struct schedule {
-	char stack[STACK_SIZE];		// 所有协程的public stack
-	ucontext_t main;			// 主线程的context
-	int nco;					// 当前启用的协程数量
-	int cap;					// 支持的协程数量
-	int running;				// 协程id
-	struct coroutine **co;		// 协程对象集: coroutine* []
+	char stack[STACK_SIZE];    // 所有协程的public stack
+	ucontext_t main;           // 主线程的context
+	int nco;                   // 当前启用的协程数量
+	int cap;                   // 支持的协程数量
+	int running;               // 协程id
+	struct coroutine **co;     // 协程对象集: coroutine* []
 };
 
 // 协程对象
 struct coroutine {
-	coroutine_func func;		// 每个协程的回调函数
-	void *ud;					// 每个协程的用户数据
-	ucontext_t ctx;				// 每个协程的context
-	struct schedule * sch;		// 每个协程从属的调度器
-	ptrdiff_t cap;				// 每个协程private stack的最大分配空间
-	ptrdiff_t size;				// 每个协程private stack的实际分配空间
-	int status;					// 每个协程的当前运行状态
-	char *stack;				// 协程的private stack
+	coroutine_func func;       // 每个协程的回调函数
+	void *ud;                  // 每个协程的用户数据
+	ucontext_t ctx;            // 每个协程的context
+	struct schedule * sch;     // 每个协程从属的调度器
+	ptrdiff_t cap;             // 每个协程private stack的最大分配空间
+	ptrdiff_t size;            // 每个协程private stack的实际分配空间
+	int status;                // 每个协程的当前运行状态
+	char *stack;               // 协程的private stack
 };
 
 struct coroutine * 
