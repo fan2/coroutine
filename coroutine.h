@@ -1,10 +1,10 @@
 #ifndef C_COROUTINE_H
 #define C_COROUTINE_H
 
-#define COROUTINE_DEAD 0
-#define COROUTINE_READY 1
-#define COROUTINE_RUNNING 2
-#define COROUTINE_SUSPEND 3
+#define COROUTINE_DEAD 0		// 终止状态
+#define COROUTINE_READY 1		// 初始new状态
+#define COROUTINE_RUNNING 2		// resume from READY or SUSPEND
+#define COROUTINE_SUSPEND 3		// 中止yield状态
 
 struct schedule;
 
