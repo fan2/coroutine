@@ -29,7 +29,7 @@ struct schedule {
 
 // 协程对象
 struct coroutine {
-	coroutine_func func;       // 每个协程的回调函数
+	coroutine_func func;       // 每个协程的函数体
 	void *ud;                  // 每个协程的用户数据
 	ucontext_t ctx;            // 每个协程的context
 	struct schedule * sch;     // 每个协程从属的调度器
