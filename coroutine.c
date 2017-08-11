@@ -19,11 +19,11 @@ struct coroutine;
 
 // 调度器
 struct schedule {
-	char stack[STACK_SIZE];    // 所有协程的public stack
+	char stack[STACK_SIZE];    // 所有协程的public stack，栈上空间
 	ucontext_t main;           // 主线程的context
 	int nco;                   // 当前启用的协程数量
 	int cap;                   // 支持的协程数量
-	int running;               // 协程id
+	int running;               // 当前正在执行的协程id
 	struct coroutine **co;     // 协程对象集: coroutine* []
 };
 
@@ -36,7 +36,7 @@ struct coroutine {
 	ptrdiff_t cap;             // 每个协程private stack的最大分配空间
 	ptrdiff_t size;            // 每个协程private stack的实际分配空间
 	int status;                // 每个协程的当前运行状态
-	char *stack;               // 协程的private stack
+	char *stack;               // 每个协程的private stack
 };
 
 struct coroutine * 
@@ -100,10 +100,10 @@ coroutine_new(struct schedule *S, coroutine_func func, void *ud) {
 		int i;
 		for (i=0;i<S->cap;i++) {
 			int id = (i+S->nco) % S->cap;
-			if (S->co[id] == NULL) { // unuse empty slot
+			if (S->co[id] == NULL) {     // unuse empty slot
 				S->co[id] = co;
 				++S->nco;
-				return id; // 返回创建好的协程id
+				return id;              // 返回创建好的协程id
 			}
 		}
 	}
@@ -126,6 +126,7 @@ mainfunc(uint32_t low32, uint32_t hi32) {
 	S->running = -1;	// reset
 }
 
+// stack从高地址向低地址生长, 即从stack bottom向stack top存储数据
 void 
 coroutine_resume(struct schedule * S, int id) {
 	// 当前没有正在运行的协程，否则等待当前协程逻辑单元执行完或yield挂起才能resume下一个。
@@ -150,7 +151,8 @@ coroutine_resume(struct schedule * S, int id) {
 		printf("COROUTINE_READY: coroutine id[%d] return\n", S->running);
 		break;
 	case COROUTINE_SUSPEND:		// SUSPEND->RUNNING
-		// stack从高地址向低地址生长, 即从stack bottom向stack top存储数据
+		// 首次resume运行(READY->RUNNING)时，makecontext 之前设置每个 coroutine::ctx.uc_stack.ss_sp 都指向 S->stack
+		// 唤醒挂起的协程，真正执行前，将虚拟私有栈 C->stack（堆上空间） 拷贝到公用交换栈 S->stack（栈上空间） 中
 		memcpy(S->stack + STACK_SIZE - C->size, C->stack, C->size);
 		S->running = id;
 		C->status = COROUTINE_RUNNING;
@@ -168,7 +170,7 @@ coroutine_resume(struct schedule * S, int id) {
 static void
 _save_stack(struct coroutine *C, char *top) {
 	// 在stack上创建一个局部变量, 标识当前栈顶(SP)的位置(低地址)
-	char dummy = 0;
+	char dummy = 0;                        // stack::top
 	printf("_save_stack: &C[%p] top[%p] &dummy[%p] top - &dummy[%d] STACK_SIZE[%d]\n", &C, top, &dummy, top - &dummy, STACK_SIZE);
 	// 检查stack是否有溢出
 	assert(top - &dummy <= STACK_SIZE);
@@ -176,11 +178,11 @@ _save_stack(struct coroutine *C, char *top) {
 	// 判断协程栈的空间是否足够, 若不够则重新分配
 	if (C->cap < top - &dummy) {
 		free(C->stack);
-		C->cap = top-&dummy;
-		C->stack = malloc(C->cap);
+		C->cap = top-&dummy;              // ebp-esp
+		C->stack = malloc(C->cap);        // 堆上分配的一块空间虚拟成栈来使用
 	}
-	C->size = top - &dummy;
-	memcpy(C->stack, &dummy, C->size);
+	C->size = top - &dummy;                // ebp-esp
+	memcpy(C->stack, &dummy, C->size);     // 将当前协程运行时的栈帧活动区拷贝到私有“栈”
 	// 按需保存当前协程的stack (end)
 }
 
@@ -190,7 +192,6 @@ coroutine_yield(struct schedule * S) {
 	int id = S->running;
 	printf("coroutine_yield: coroutine id[%d] into\n", S->running);
 	assert(id >= 0);	// 当前有正在运行的协程
-	// 注意makecontext()时指定ss_sp为S->stack, 当C->ctx执行时, 协程的栈是存储在S->stack上的, 即把堆上分配的一块空间虚拟成栈来使用
 	struct coroutine * C = S->co[id];
 	// 与栈顶S->stack的位置进行比较
 	printf("coroutine_yield: &C[%p] S->stack[%p]\n", &C, S->stack);
